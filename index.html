@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Progetto I InfoVis</title>
+	<meta content="text/html;charset=utf-8" http-equiv="Content-Type">
+	<meta content="utf-8" http-equiv="encoding">
+    <script src="lib/d3.v6.min.js"></script>
+    <button onClick="window.location.reload();">Reset</button>
+</head>
+<body>
+
+<svg width="720" height="720"></svg>	
+<script>
+
+var scale = d3.scaleLinear().domain([0,100]).range([0,720]);  
+
+//rappresenta la generalizzazione di un sistema che dati in input le coordinate del triangolo, la base e l'altezza, ritorna i tre vertici del triangolo
+function system(bx, by, b, h){
+    Yc = (-h +((by*3)/2))*(2/3) 
+    Ya = ((by*3)/2) - (Yc/2)
+    Yb = Ya
+    Xa = bx -(b/3) -((b/2)/3)
+    Xb = b + Xa
+    Xc = Xa +(b/2)
+    return  Xa+' '+Ya+','+Xb+' '+Yb+','+Xc+' '+Yc;
+}
+//calcola, dati in input le coordinate dei tre vertici di un triangolo il baricentro dello stesso
+function baricentro(x1,x2,x3,y1,y2,y3){
+    bx = (x1+x2+x3)/3
+    by = (y1+y2+y3)/3
+    return [(Math.round(bx)),(Math.round(by))]; 
+}
+//trova, dati in input le coordinate del triangolo e il dataset, la base, l'altezza e il colore associato allo stesso
+function get_bh(x, y, data){
+    for(let i = 0; i<data.length; i++){ 
+        let b = [] 
+        for(const e in data[i]){
+            b.push(data[i][e]);
+        }
+        if(scale(b[0]) == x && scale(b[1]) == y){
+            return [scale(b[2]), scale(b[3]), b[4]];
+        }
+    }
+}
+//mi aggiorna un dataset temporaneo che mi garantisce di non sporcare il dataset originale e allo stesso tempo mi fa fare tutti gli spostamenti che voglio
+function update_ds(x,y,b,h,c,dataset){
+    for(let i = 0; i<dataset.length; i++){
+        if(scale(dataset[i].x)==x && scale(dataset[i].y)==y){
+            dataset[i].z = Math.round(scale.invert(b))
+            dataset[i].v = Math.round(scale.invert(h))
+            dataset[i].c = c
+        }
+    }
+}
+
+d3.json("dataset.json")
+        .then(function(data) {
+            var svg = d3.select("svg").style('background', '#d9edf7');          
+            //disegno del piano e dei triangoli nel dataset 
+            var s = svg.selectAll("polyline")
+                .data(data)
+                .enter()
+                .append("polyline")
+                .attr("points", function(d){ return system(scale(d.x), scale(d.y), scale(d.z), scale(d.v))})
+                .attr("fill", function(d){ return d.c})
+                .attr("id", function(d, i){return "polyline"+i;});
+            //copia del dataset necessaria per effettuare tutte le possibili transizioni
+            var dataset = data;
+            //inizializzazioni variabili id per ricordarmi del primo triangolo selezionato e di tag per tenere traccia dei "click"
+            var id = null;
+            var tag = false;
+            //inizio dell'interazione basata su click 
+            s.on('click', function(d){
+                if (!(tag)) {
+                    tag = true;
+                    //mi memorizzo "l'id" del triangolo che clicco per primo e lo rendo trasparente
+                    id = d.target
+                    //il triangolo selezionato diventa trasparente
+                    d3.select(d.target).transition()
+                    .attr("fill","transparent")
+                    .duration(1500)
+                }       
+                else {
+                    //mi ricavo le coordinate del primo triangolo su cui clicco
+                    var coordinate_corr = baricentro(id.points[0].x,id.points[1].x,id.points[2].x,id.points[0].y,id.points[1].y,id.points[2].y)
+                    //mi ricavo la base e altezza associati a primo triangolo su cui clicco
+                    var bh_cor = get_bh(coordinate_corr[0], coordinate_corr[1], dataset)
+                    //mi ricavo le coordinate del secondo triangolo su cui clicco
+                    var coordinate_suc = baricentro(d.target.points[0].x,d.target.points[1].x,d.target.points[2].x,d.target.points[0].y,d.target.points[1].y,d.target.points[2].y)
+                    //mi ricavo la base e altezza associati a secondo triangolo su cui clicco
+                    var bh_suc = get_bh(coordinate_suc[0], coordinate_suc[1], dataset)
+                    tag = false;
+                    //transizioni che scambia le variabili di base e altezza tra triangoli e fa tornare colorato il triangolo trasparente
+                    d3.select(d.target).transition()
+                        .attr("points", function(){ return system(coordinate_suc[0], coordinate_suc[1], bh_cor[0], bh_cor[1])})
+                        .attr("fill", bh_suc[2])
+                        .duration(1500)
+                    update_ds(coordinate_suc[0], coordinate_suc[1], bh_cor[0], bh_cor[1], bh_suc[2], dataset)
+                    d3.select(id).transition()
+                        .attr("points", function(){ return system(coordinate_corr[0], coordinate_corr[1], bh_suc[0], bh_suc[1])})
+                        .attr("fill", bh_cor[2])
+                        .duration(1500)
+                    update_ds(coordinate_corr[0], coordinate_corr[1], bh_suc[0], bh_suc[1], bh_cor[2], dataset)
+                }
+            })
+        })
+        .catch(function(error) {
+                console.log("Something went wrong! Try Again.")
+        });
+</script>
+
+</body>
+</html>
