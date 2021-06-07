@@ -10,13 +10,47 @@
 <body>
 
 <script>
+//console.log(width)
 var width = document.documentElement.clientWidth;
 var height = document.documentElement.clientHeight;
-var xScale = d3.scaleLinear().domain([10,85]).range([150,width-150]);
-var yScale = d3.scaleLinear().domain([15,85]).range([150,height-150]);
-var bScale =  d3.scaleLinear().domain([0,100]).range([0,width]);
-var hScale =  d3.scaleLinear().domain([0,100]).range([0,height]);
+var xSCale
+var ySCale
+var bSCale
+var hSCale
 
+//serie di funzioni che mi permettono di ricavarmi dinamicamente minimi e massimi dal dataset
+function get_max_x(dataset){
+    var tmp = null;
+    for(let i = 0; i<dataset.length; i++){ 
+        if(dataset[i].x > tmp)
+            tmp = dataset[i].x
+    }
+    return tmp
+}
+function get_min_x(dataset){
+    var tmp = null;
+    for(let i = 0; i<dataset.length; i++){ 
+        if(dataset[i].x < tmp)
+            tmp = dataset[i].x
+    }
+    return tmp
+}
+function get_max_y(dataset){
+    var tmp = null;
+    for(let i = 0; i<dataset.length; i++){
+        if(dataset[i].y > tmp)
+            tmp = dataset[i].y
+    }
+    return tmp
+}
+function get_min_y(dataset){
+    var tmp = null;
+    for(let i = 0; i<dataset.length; i++){
+        if(dataset[i].y < tmp)
+            tmp = dataset[i].y
+    }
+    return tmp
+}
 
 //rappresenta la generalizzazione di un sistema che dati in input le coordinate del triangolo, la base e l'altezza, ritorna i tre vertici del triangolo
 function system(bx, by, b, h){
@@ -41,25 +75,38 @@ function get_bh(x, y, data){
         for(const e in data[i]){
             b.push(data[i][e]);
         }
-        console.log([x, xScale(b[0]), y, yScale(b[1])])
-        if(Math.round(xScale(b[0])) == x && Math.round(yScale(b[1])) == y){
-            return [Math.round(bScale(b[2])), Math.round(hScale(b[3])), b[4]];
+        if(Math.round(xSCale(b[0])) == x && Math.round(ySCale(b[1])) == y){
+            return [Math.round(bSCale(b[2])), Math.round(hSCale(b[3])), b[4]];
         }
     }
 }
 //mi aggiorna un dataset temporaneo che mi garantisce di non sporcare il dataset originale e allo stesso tempo mi fa fare tutti gli spostamenti che voglio
 function update_ds(x,y,b,h,c,dataset){
     for(let i = 0; i<dataset.length; i++){
-        if(Math.round(xScale(dataset[i].x))==x && Math.round(yScale(dataset[i].y))==y){
-            dataset[i].z = Math.round(bScale.invert(b))
-            dataset[i].v = Math.round(hScale.invert(h))
+        if(Math.round(xSCale(dataset[i].x))==x && Math.round(ySCale(dataset[i].y))==y){
+            dataset[i].z = Math.round(bSCale.invert(b))
+            dataset[i].v = Math.round(hSCale.invert(h))
             dataset[i].c = c
         }
     }
 }
 
+
 d3.json("dataset.json")
         .then(function(data) {
+            var mx= get_max_x(data)
+            var minx = get_min_x(data)
+            var my = get_max_y(data)
+            var miny = get_min_y(data)
+            //scale
+            var xScale = d3.scaleLinear().domain([minx,mx]).range([0,width-200]);
+            xSCale= xScale
+            var yScale = d3.scaleLinear().domain([miny,my]).range([0,height-150]);
+            ySCale = yScale
+            var bScale =  d3.scaleLinear().domain([0,100]).range([0,width]);
+            bSCale= bScale
+            var hScale =  d3.scaleLinear().domain([0,100]).range([0,height]);
+            hSCale= hScale
             var svg = d3.select("body").append("svg").attr("width", width).attr("height", height).style('background', '#d9edf7');          
             //disegno del piano e dei triangoli nel dataset 
             var s = svg.selectAll("polyline")
@@ -71,6 +118,7 @@ d3.json("dataset.json")
                 .attr("id", function(d, i){return "polyline"+i;});
             //copia del dataset necessaria per effettuare tutte le possibili transizioni
             var dataset = data;
+            //console.log(dataset)
             //inizializzazioni variabili id per ricordarmi del primo triangolo selezionato e di tag per tenere traccia dei "click"
             var id = null;
             var tag = false;
@@ -112,6 +160,7 @@ d3.json("dataset.json")
         .catch(function(error) {
                 console.log("Something went wrong! Try Again.")
         });
+
 </script>
 
 </body>
